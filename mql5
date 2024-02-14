@@ -1,0 +1,98 @@
+
+//+------------------------------------------------------------------+
+//|                                         MP Squeeze Momentum.mq4 |
+//|                          Copyright 2022, Forex Robot Easy Team    |
+//|                                          https://forexroboteasy.com |
+//+------------------------------------------------------------------+
+
+#property copyright 'Copyright 2022, Forex Robot Easy Team'
+#property link      'https://forexroboteasy.com'
+#property version   '1.00'
+#property strict
+
+// Indicator Parameters
+extern int bbPeriod = 20; // Bollinger Bands period
+extern double bbDeviation = 2.0; // Bollinger Bands standard deviation
+
+extern int kcPeriod = 20; // Keltner Channels period
+extern double kcMultiplier = 2.0; // Keltner Channels multiplier
+
+// Global Variables
+double upperBB[];
+double lowerBB[];
+double upperKC[];
+double lowerKC[];
+bool squeezePeriod[];
+bool releasePeriod[];
+bool breakout[];
+
+//+------------------------------------------------------------------+
+//| Custom indicator initialization function                         |
+//+------------------------------------------------------------------+
+int OnInit()
+{
+   // Indicator buffers mapping
+   SetIndexBuffer(0, upperBB);
+   SetIndexBuffer(1, lowerBB);
+   SetIndexBuffer(2, upperKC);
+   SetIndexBuffer(3, lowerKC);
+   SetIndexBuffer(4, squeezePeriod);
+   SetIndexBuffer(5, releasePeriod);
+   SetIndexBuffer(6, breakout);
+
+   // Set indicator labels
+   IndicatorShortName('MP Squeeze Momentum');
+
+   return(INIT_SUCCEEDED);
+}
+
+//+------------------------------------------------------------------+
+//| Custom indicator iteration function                              |
+//+------------------------------------------------------------------+
+int OnCalculate(const int rates_total,
+                const int prev_calculated,
+                const datetime &time[],
+                const double &open[],
+                const double &high[],
+                const double &low[],
+                const double &close[],
+                const long &tick_volume[],
+                const long &volume[],
+                const int &spread[])
+{
+   int limit = rates_total - prev_calculated;
+
+   // Calculate Bollinger Bands
+   for (int i = 0; i < limit; i++)
+   {
+      double ma = iMA(NULL, 0, bbPeriod, 0, MODE_SMA, PRICE_TYPICAL, i);
+      double stddev = iStdDev(NULL, 0, bbPeriod, 0, MODE_SMA, PRICE_TYPICAL, i);
+
+      upperBB[i] = ma + bbDeviation * stddev;
+      lowerBB[i] = ma - bbDeviation * stddev;
+   }
+
+   // Calculate Keltner Channels
+   for (int i = 0; i < limit; i++)
+   {
+      double ma = iMA(NULL, 0, kcPeriod, 0, MODE_SMA, PRICE_TYPICAL, i);
+
+      upperKC[i] = ma + kcMultiplier * ATR(NULL, 0, kcPeriod, i);
+      lowerKC[i] = ma - kcMultiplier * ATR(NULL, 0, kcPeriod, i);
+   }
+
+   // Determine squeeze period and release period
+   for (int i = 0; i < limit; i++)
+   {
+      squeezePeriod[i] = (lowerBB[i] > lowerKC[i] && upperBB[i] < upperKC[i]);
+      releasePeriod[i] = !squeezePeriod[i];
+   }
+
+   // Identify breakouts
+   for (int i = 1; i < limit; i++)
+   {
+      breakout[i] = (squeezePeriod[i-1] && releasePeriod[i]);
+   }
+
+   return(rates_total);
+}
